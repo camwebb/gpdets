@@ -1,0 +1,424 @@
+#!/usr/bin/gawk -f
+
+#  ls -Path Desktop/GPTrees -Attributes Directory -r | Format-Table -Property FullName
+
+BEGIN{
+
+  config()
+  read_args()
+  read_xls()
+  validate()
+  read_photo()
+
+  compute()
+  make_html()
+}
+
+function config() {
+  PROCINFO["sorted_in"] = "@ind_str_asc"
+  Collist = "c_code|c_coll_by|c_coll_date|c_notes|c_plot|c_tag|"    \
+    "m_batang|m_daun|m_fam|m_genus|m_getah|m_macam|m_morpho_code|m_morpho_rb|" \
+    "m_notes|m_species|p_across|p_along|p_dbh|p_dir|p_direct_det|"  \
+    "p_fallen_lvs|p_notes|p_plot|p_same_as_tag|p_tag|p_type"
+}
+
+function read_args(    arg) {
+  # Read arguments, check, give usage. Long args to avoid Gawk clash
+  
+  for (arg = 1; arg < ARGC; arg++) {
+    if ((ARGV[arg] ~ /^--/) &&                          \
+        (ARGV[arg] !~ /^--(plot|coll|morpho|photo)$/))
+      fail("unrecognized argument: '" ARGV[arg] "'")
+    else if (ARGV[arg] == "--plot"  ) PLOTFILE   = ARGV[arg+1]
+    else if (ARGV[arg] == "--coll"  ) COLLFILE   = ARGV[arg+1]
+    else if (ARGV[arg] == "--morpho") MORPHOFILE = ARGV[arg+1]
+    else if (ARGV[arg] == "--photo" ) PHOTOFILE  = ARGV[arg+1]
+  }
+  
+  if (!PLOTFILE || !COLLFILE || !MORPHOFILE || !PHOTOFILE ) {
+    print "Usage: gpreport --plot <file.xls>   \\\n"                    \
+      "                --coll <file.xls>   \\\n"                             \
+      "                --morpho <file.xls> \\\n"                           \
+      "                --photo <file.txt>"  > "/dev/stderr"
+    exit 1
+  }
+}
+
+function read_xls(  i, j, collist) {
+  # system("localc --convert-to csv " PLOTFILE " " COLLFILE " " MORPHOFILE) 
+  read_csv(PLOTFILE, "p")  
+  read_csv(COLLFILE, "c")  
+  read_csv(MORPHOFILE, "m")
+}
+
+function read_csv(file,prefix,   i,code,line) {
+
+  FPAT = "([^,]*)|(\"([^\"]|\"\")+\")"
+  while ((getline < gensub(/xlsx$/,"csv","G",file))>0) {
+    # headers
+    line++
+    if (line == 1)
+      for (i = 1; i <= NF; i++)
+        code[i] = $i
+    else
+      for (i = 1; i <= NF; i++)
+        D[(prefix "_" code[i])][line-1] = clean($i)
+  }
+}
+
+function validate(   i, collist, m, t, c, f) {
+
+  # All xls files: test for all columns present once only
+  split(Collist, collist, "|")
+  for (i in D)
+    if (i != collist[++j])
+      fail("ERROR: error in column list at '" i "'")
+  
+  # Morpho
+  for (i in D["m_morpho_code"]) {
+    m = toupper(D["m_morpho_code"][i])
+    f = toupper(D["m_fam"][i])
+    
+    # transfer, and test: duplicate morpho 
+    if (++Morphos[m] > 1)
+      err("Morpho: morpho '" m "' is a duplicate.")
+  
+    # test for format
+    if (m !~ /^[0-9A-Z]{8}$/)
+      err("Morpho: morpho '" m "' is not 8 chars.")
+
+    # test for fam format
+    if (f !~ /^[A-Z]{5}$/)
+      err("Morpho: morpho '" m "', fam '" f "' bad format.")
+    else
+      Fam[m] = f
+  }
+  
+  # Plots
+  for (i in D["p_plot"]) {
+    
+    # transfer
+    t = toupper(D["p_plot"][i]) "-" D["p_tag"][i]
+    Plot[t] = toupper(D["p_plot"][i])
+    Dd[t] = D["p_direct_det"][i]
+    Sa[t] = D["p_same_as_tag"][i]
+    Lf[t] = D["p_fallen_lvs"][i]
+    Dbh[t] = D["p_dbh"][i]
+    Hab[t] = D["p_type"][i]
+    
+    # test for t format
+    if (t !~ /^[A-Z]{2}[0-9]{1,3}-[0-9]+$/)
+      err("Plots: tree '" t "' is the wrong format.")
+    
+    # test for duplicates
+    if (++Trees[t] > 1)
+      err("Plots: tree '" t "' is a duplicate.")
+  
+    # test: only one of three det options allowed
+    if ((Dd[t] && Sa[t]) || (Dd[t] && Lf[t]) || (Lf[t] && Sa[t]))
+      err("Plots: tree '" t "' has more than just one kind of det.")
+    
+    # test for formats in det columns
+    if (Dd[t])
+      if (Dd[t] !~ /^[0-9A-Z]{8}$/)
+        err("Plots: tree '" t "', direct_det '" Dd[t] "' is not an 8-char morphotype.")
+    if (Sa[t])
+      if (Sa[t] !~ /^[0-9]+$/)
+        err("Plots: tree '" t "', same_as_tag '" Sa[t] "' is not an integer.")
+    if (Lf[t])
+      if (Lf[t] !~ /^dapat$/)
+        err("Plots: tree '" t "', fallen_lvs '" Lf[t] "' is not 'dapat'.")
+    
+    # test: does the direct det morpho exist in morpho?
+    if (Dd[t])
+      if (!Morphos[Dd[t]]) {
+        err("Plots: tree '" t "', direct_det '" Dd[t]   \
+            "' is not in Morpho spreadsheet.")
+        delete Morphos[Dd[t]]
+      }
+
+    # test: is the same_as referring to self?
+    if (Sa[t])
+      if (Sa[t] == D["p_tag"][i])
+        err("Plots: tree '" t "', same_as_tag '" Sa[t] "' refers to self.")
+
+    # type of det
+    if (Dd[t])
+      Dtype[t] = "direct"
+    else if (Sa[t])
+      Dtype[t] = "same_as"
+    else if (Lf[t])
+      Dtype[t] = "fallen_lf"
+    
+    # check for any activity in plot
+    if (Dd[t] || Sa[t] || Lf[t])
+      Active[D["p_plot"][i]] = 1
+
+  }
+
+  # Colls
+  for (i in D["c_code"]) {
+    c = D["c_code"][i]
+    Ct[c] = toupper(D["c_plot"][i]) "-" D["c_tag"][i]
+    
+    # test for c format
+    if (c !~ /^[a-z]{2}-[0-9]+$/)
+      err("Colls: coll '" c "' is the wrong format.")
+
+    # test for duplicates
+    if (++Colls[c] > 1)
+      err("Colls: coll '" c "' is a duplicate.")
+
+    # test for date format
+    if (D["c_coll_date"][i] !~ /^2022-0[1-9]-[123][0-9]$/)
+      err("Colls: coll '" c "', date '" D["c_coll_date"][i] "' bad format.")
+    
+    # test for Ct
+    if (!Trees[Ct[c]])
+      err("Colls: tree/tag '" Ct[c] "' is not in Plots spreadsheet.")
+
+  }
+
+    
+  # for (i in Morpho)
+  #   print i
+  # for (i in Id)
+  #   print i, Id[i]
+  # for (i in Active)
+  #   print i " is active"
+}
+
+function read_photo(  x, fam) {
+  
+  while ((getline < PHOTOFILE)>0) {
+    # skip blanks, etc
+    if ($0 ~ /\\/) {
+      gsub(/C:\\Users\\cowebb\\Desktop\\GPTrees\\/,"",$0)
+      # only parse lines with a tree
+      if (split($0, x, "\\") == 3) {
+        
+        # does the morpho exist?
+        if (!Morphos[x[2]]) {
+          err("Photos: tree '" x[3] "', morpho '"x[2]   \
+              "' is not in morpho spreadsheet.")
+          delete Morpho[x[3]]
+        }
+        else
+          fam[x[2]] = fam[x[2]] " " x[1]
+
+        # Is the fam the same as in morpho?
+        if (x[1] != Fam[x[2]]) 
+          err("Photos: morpho '" x[2] "', family '" x[1]                \
+              "' != fam in Morpho: '" Fam[x[2]] "'.")
+            
+        # Does the tree exist?
+        if (!Trees[x[3]]) {
+          err("Photos: tree '"x[3] "' is not in plot spreadsheet.")
+          delete Trees[x[3]]
+        }
+
+        # has it been classed as photo to morpho?
+        if (!Lf[x[3]])
+          err("Photos: tree '"x[3] "' is not 'dapat' in plot spreadsheet.")
+        
+        # if both exists
+        if (Morphos[x[2]] && Trees[x[3]])
+          F2m[x[3]] = x[2]
+
+        
+      }
+    }
+  }
+
+  # Check all dapat are in 
+  for (i in Trees)
+    if (Lf[i])
+      if (!F2m[i]) {
+        err("Morpho: tree '" i "' says 'fallen_lf' but there is no photo.")
+        delete F2m[i]
+      }
+  
+  # test for occurrence of morpho in two or more fams
+  for (i in fam)
+    if (length(fam[i]) > 6)
+      err("Morpho '" i "' in photo list is in >1 family:" fam[i] ".")
+}
+
+function compute() {
+  for (i in Trees) {
+    # fallen leaf det overrides
+    if (F2m[i])
+      Morpho[i] = F2m[i]
+    # direct next
+    else if (Dd[i]) {
+      Morpho[i] = Dd[i]
+      delete F2m[i]
+    }
+    else
+      delete F2m[i]
+  }
+
+  # rerun for Same as once dets given 
+  for (i in Trees)
+    if (Sa[i]) {
+      # TODO make this check not just morpho, but either Ddet or photo
+      if (Morpho[Plot[i] "-" Sa[i]])
+        Morpho[i] = Morpho[Plot[i] "-" Sa[i]]
+      else
+        err("Plots: tree '" i "', same_as_tag '" Sa[i]  \
+           "' refers to plant without morpho.")
+    }
+
+  for (i in Colls) {
+    Cdet[i] = Morpho[Ct[i]]
+    Mcoll[Morpho[Ct[i]]] = 1
+  }
+}
+
+# make a single html page with sections, easy to navigate with links
+
+# -- HTML FUNCTIONS --------------------------------------------------------
+
+function make_html() {
+
+  header()
+  
+  print "<h1>GP Dets Project 2022: progress report</h1>"
+  print "<p><i>Run at " strftime("%Y-%m-%d %H:%M %Z") ".</i></p>"
+
+  # Contents
+  print "<p><b>Contents</b>: "                                                 \
+    ((Err) ? "<a href=\"#errors\">Errors</a> | " : "")                  \
+    "<a href=\"#summary\">Summary</a> | "                               \
+    "<a href=\"#morpho\">Morpho</a> | "                                 \
+    "<a href=\"#colls\">Collections</a> | "                             \
+    "<a href=\"#plots\">Plots</a> | "                                      \
+    "<a href=\"#hitlist\">Hitlist</a>"                                  \
+    "</p>"
+
+  if (Err)
+    html_err()
+
+  print "<h2>Summary</h2><a name=\"summary\"></a>"
+  print "<table>"
+  print "<tr><td>Total trees in 'plots' spreadsheet:</td>"          \
+    "<td style=\"text-align: right;\">" length(Trees) "</td></tr>"
+  print "<tr><td>Total morphos in 'morpho' spreadsheet:</td>"   \
+    "<td style=\"text-align: right;\">" length(Morphos) "</td></tr>"
+  print "<tr><td>Total trees with fallen leaf morphos:</td>"\
+    "<td style=\"text-align: right;\">" length(F2m) "</td></tr>"
+  print "<tr><td>Number of plots that have any dets:</td>"\
+    "<td style=\"text-align: right;\">" length(Active) "</td></tr>"
+  print "</table>"
+
+  # Morpho
+  print "<h2>Morphotypes</h2><a name=\"morpho\"></a>"
+  print "<table>"
+  print "<tr><th>Morpho</th><th>Collected</th></tr>"
+  for (i in Morphos)
+    print "<tr><td><a name=\"m_" i "\"></a>" i  "</td>"    \
+      "<td>" ((Mcoll[i]) ? "sudah" : "") "</td></tr>"
+  print "</table>"
+
+  # Colls
+  print "<h2>Collections</h2><a name=\"colls\"></a>"
+  print "<table>"
+  print "<tr><th>Coll code</th><th>Plant</th><th>Morpho</th></tr>"
+  for (i in Colls)
+    print "<tr><td>" i  "</td>"                 \
+      "<td>" Ct[i] "</td>"                      \
+      "<td>" Morpho[Ct[i]] "</td></tr>"
+  print "</table>"
+
+  # Plots
+  print "<h2>Plots (active only)</h2><a name=\"plots\"></a>"
+  print "<table>"
+  print "<tr><th>Plant</th><th>Type</th><th>DBH</th><th>Det type</th><th>Morpho</th></tr>"
+  for (i in Trees)
+    if (Active[Plot[i]])
+      print "<tr><td><a name=\"p_" i "\"></a>" i  "</td>"        \
+        "<td>" Hab[i] "</td>"                   \
+        "<td style=\"text-align: right;\">" sprintf("%.1f",Dbh[i]) "</td>"      \
+        "<td>" Dtype[i] "</td>"                    \
+        "<td><a href=\"#m_" Morpho[i] "\">" Morpho[i] "</a></td></tr>"                   
+  print "</table>"
+
+  # Hitlists
+  print "<h2>Hitlist for collecting morphos</h2><a name=\"hitlist\"></a>"
+  print "<table>"
+  print "<tr><th>Morpho</th><th>Possible individuals (DBH)</th></tr>"
+  for (i in Morphos)
+    if (!Mcoll[i]) {
+      print "<tr><td>" i " :</td><td>"
+      for (j in Trees)
+        if (Morpho[j] == i)
+          print "<a href=\"#p_" j "\">" j "</a> (" Dbh[j] "), "
+      print "</td></tr>"
+    }
+  print "</table>"
+
+  footer()
+}
+
+function header() {
+  # version history: [chars app] -> [tcm] -> [phyedit] -> here
+  
+  # Use html5
+  # print "Content-type: text/html\n"
+  print "<!DOCTYPE html>"
+  print "<html xmlns=\"http://www.w3.org/1999/xhtml\">"
+  print "<head><title>GP dets (run " strftime("%Y-%m-%d %H:%M %Z") ")</title>"
+  print "<meta http-equiv=\"Content-Type\" content=\"text/html; \
+           charset=utf-8\" />"
+  print "<style>"
+  print "body { font-size: 14px; font-family: " \
+    "Verdana, Arial, Helvetica, sans-serif; }"
+  print ".main {max-width: 1200px; padding-top: 30px; margin-left: auto;" \
+    "  margin-right: auto; }"
+  print "table { font-family: monospace;}"
+  print "th, td { text-align: left; padding-left:10px; padding-right:10px;}"
+  print "a { color:#15358d; text-decoration:none; border-bottom-style:none }"
+  print "a:visited { color:#9f1dbc }"
+  print "a:hover {color:#15358d; border-bottom-style:solid; "\
+    "border-bottom-width:thin }"
+  print "</style>"
+  print "</head>\n<body>"
+  print "<div class=\"main\">"
+}
+
+function footer() {
+  print "</div>"
+  print "</body>\n</html>";
+}
+
+function html_err(   e, i) {
+  
+  print "<h2>Errors</h2><a name=\"errors\"></a>"
+  print "<ul>"
+  for (i = 1; i < split(Err, e, "\n"); i++)
+    print "<li>" e[i] "</li>"
+  print "</ul>"
+
+}
+
+# -- HELPER FUNCTIONS ------------------------------------------------------
+
+function err(msg) {
+  Err = Err msg "\n"
+}
+
+function fail(msg) {
+  print "ERROR: " msg > "/dev/stderr"
+  exit 1
+}
+
+function clean(t) {
+  gsub(/^"/,"",t)
+  gsub(/"$/,"",t)
+  gsub(/""/,"\"",t)
+  gsub(/^ +/,"",t)
+  gsub(/ +$/,"",t)
+  gsub(/\|/,"{PIPE}",$0)
+  return t
+}
+
