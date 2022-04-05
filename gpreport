@@ -7,8 +7,6 @@ BEGIN{
   config()
   read_args()
   read_xls()
-  validate()
-  read_photo()
 
   compute()
   make_html()
@@ -20,49 +18,85 @@ function config() {
     "m_batang|m_daun|m_fam|m_genus|m_getah|m_macam|m_morpho_code|m_morpho_rb|" \
     "m_notes|m_species|p_across|p_along|p_dbh|p_dir|p_direct_det|"  \
     "p_fallen_lvs|p_notes|p_plot|p_same_as_tag|p_tag|p_type"
+
+  "mktemp -d" | getline TMPDIR
 }
 
-function read_args(    arg) {
+function read_args() {
   # Read arguments, check, give usage. Long args to avoid Gawk clash
   
-  for (arg = 1; arg < ARGC; arg++) {
-    if ((ARGV[arg] ~ /^--/) &&                          \
-        (ARGV[arg] !~ /^--(plot|coll|morpho|photo)$/))
-      fail("unrecognized argument: '" ARGV[arg] "'")
-    else if (ARGV[arg] == "--plot"  ) PLOTFILE   = ARGV[arg+1]
-    else if (ARGV[arg] == "--coll"  ) COLLFILE   = ARGV[arg+1]
-    else if (ARGV[arg] == "--morpho") MORPHOFILE = ARGV[arg+1]
-    else if (ARGV[arg] == "--photo" ) PHOTOFILE  = ARGV[arg+1]
+  # for (arg = 1; arg < ARGC; arg++) {
+  #   if ((ARGV[arg] ~ /^--/) &&                          \
+  #       (ARGV[arg] !~ /^--(plot|coll|morpho|photo)$/))
+  #     fail("unrecognized argument: '" ARGV[arg] "'")
+  #   else if (ARGV[arg] == "--plot"  ) PLOTFILE   = ARGV[arg+1]
+  #   else if (ARGV[arg] == "--coll"  ) COLLFILE   = ARGV[arg+1]
+  #   else if (ARGV[arg] == "--morpho") MORPHOFILE = ARGV[arg+1]
+  #   else if (ARGV[arg] == "--photo" ) PHOTOFILE  = ARGV[arg+1]
+  # }
+  # if (!PLOTFILE || !COLLFILE || !MORPHOFILE || !PHOTOFILE ) {
+  #   print "Usage: gpreport --plot <file.xls>   \\\n"                    \
+  #     "                --coll <file.xls>   \\\n"                             \
+  #     "                --morpho <file.xls> \\\n"                           \
+  #     "                --photo <file.txt>"  > "/dev/stderr"
+  #   exit 1
+  # }
+
+  if (ARGC != 2)
+    fail("Usage: gpreport <file.xlsx>")
+  else
+    INFILE = ARGV[1]
+}
+
+function read_xls(    i, line, cmd) {
+  # read first 4 sheets
+  for (i = 1; i <= 4; i++) {
+    line = 0
+    cmd = "xlsx2csv -s " i " " INFILE
+    while ((cmd | getline) > 0)
+      S[i][++line] = $0
+    close(cmd)
+
+    switch (S[i][1]) {
+      case /fallen_lvs/  : x["p"] = i ; break
+      case /batang/      : x["m"] = i ; break
+      case /coll_date/   : x["c"] = i ; break
+      case /powershell/  : x["f"] = i ; break
+      default            :
+        fail("sheet " i " is not one of: plots, colls, morpho or photos")
+    }
   }
   
-  if (!PLOTFILE || !COLLFILE || !MORPHOFILE || !PHOTOFILE ) {
-    print "Usage: gpreport --plot <file.xls>   \\\n"                    \
-      "                --coll <file.xls>   \\\n"                             \
-      "                --morpho <file.xls> \\\n"                           \
-      "                --photo <file.txt>"  > "/dev/stderr"
-    exit 1
-  }
+  # test
+  if (length(x) != 4)
+    fail("not all 4 sheets found")
+
+  # for (i in S)
+  #   for (j in S[i])
+  #     print i, j, S[i][j]
+
+  read_csv(S[x["p"]], "p")
+  read_csv(S[x["m"]], "m")
+  read_csv(S[x["c"]], "c")
+
+  validate()
+
+  read_photo(S[x["f"]])
 }
 
-function read_xls(  i, j, collist) {
-  # system("localc --convert-to csv " PLOTFILE " " COLLFILE " " MORPHOFILE) 
-  read_csv(PLOTFILE, "p")  
-  read_csv(COLLFILE, "c")  
-  read_csv(MORPHOFILE, "m")
-}
+function read_csv(sheet, prefix,   l,f,nf,fname,field) {
 
-function read_csv(file,prefix,   i,code,line) {
-
-  FPAT = "([^,]*)|(\"([^\"]|\"\")+\")"
-  while ((getline < gensub(/xlsx$/,"csv","G",file))>0) {
+  FPAT = "([^,]*)|(\"[^\"]+\")"
+  for (l = 1; l <= length(sheet); l++) {
+    nf = patsplit(sheet[l], field)
     # headers
-    line++
-    if (line == 1)
-      for (i = 1; i <= NF; i++)
-        code[i] = $i
+    if (l == 1)
+      for (f = 1; f <= nf; f++)
+        fname[f] = clean(field[f])
+    # data
     else
-      for (i = 1; i <= NF; i++)
-        D[(prefix "_" code[i])][line-1] = clean($i)
+      for (f = 1; f <= nf; f++)
+        D[(prefix "_" fname[f])][l-1] = clean(field[f])
   }
 }
 
@@ -188,14 +222,15 @@ function validate(   i, collist, m, t, c, f) {
   #   print i " is active"
 }
 
-function read_photo(  x, fam) {
-  
-  while ((getline < PHOTOFILE)>0) {
+function read_photo(sheet,  l, x, fam) {
+
+  # skip header
+  for (l = 2; l <= length(sheet); l++) {
     # skip blanks, etc
-    if ($0 ~ /\\/) {
-      gsub(/C:\\Users\\cowebb\\Desktop\\GPTrees\\/,"",$0)
+    if (sheet[l] ~ /\\/) {
+      gsub(/C:\\Users\\cowebb\\Desktop\\GPTrees\\/,"",sheet[l])
       # only parse lines with a tree
-      if (split($0, x, "\\") == 3) {
+      if (split(sheet[l], x, "\\") == 3) {
         
         # does the morpho exist?
         if (!Morphos[x[2]]) {
@@ -418,7 +453,7 @@ function clean(t) {
   gsub(/""/,"\"",t)
   gsub(/^ +/,"",t)
   gsub(/ +$/,"",t)
-  gsub(/\|/,"{PIPE}",$0)
+  gsub(/\|/,"{PIPE}",t)
   return t
 }
 
