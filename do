@@ -60,7 +60,7 @@ function default_page() {
   print "Content-Type: text/html\n"
   print "<!DOCTYPE html><html>                                          \
     <head>                                                              \
-    <title>Upload XLSS file for GPDets</title>                          \
+    <title>Upload XLSX file for GPDets</title>                          \
     <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"/> \
     <style>                                                             \
        body  { font-size: 14px; font-family: Arial, Helvetica, sans-serif; } \
@@ -70,7 +70,7 @@ function default_page() {
     </head>                                                             \
     <body>                                                              \
     <div class=\"main\">                                                \
-    <h1>Upload XLSS file for GPDets</h1>                                \
+    <h1>Upload XLSX file for GPDets</h1>                                \
     <form enctype=\"multipart/form-data\" action=\"do\" method=\"post\"> \
       <p>                                                               \
         <input type=\"file\" name=\"xlsx\"/><br/><br/>                  \
