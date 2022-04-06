@@ -14,9 +14,9 @@ BEGIN{
 
 function config() {
   PROCINFO["sorted_in"] = "@ind_str_asc"
-  Collist = "c_code|c_coll_by|c_coll_date|c_notes|c_plot|c_tag|"    \
-    "m_batang|m_daun|m_fam|m_genus|m_getah|m_macam|m_morpho_code|m_morpho_rb|" \
-    "m_notes|m_species|p_across|p_along|p_dbh|p_dir|p_direct_det|"  \
+  Collist = "c_code|c_coll_by|c_coll_date|c_notes|c_plot|c_tag|"   \
+    "m_batang|m_daun|m_fam|m_genus|m_getah|m_macam|m_morpho_code|" \
+    "m_notes|m_rb_coll|m_species|p_across|p_along|p_dbh|p_dir|p_direct_det|"  \
     "p_fallen_lvs|p_notes|p_plot|p_same_as_tag|p_tag|p_type"
 
   "mktemp -d" | getline TMPDIR
