@@ -196,7 +196,7 @@ function validate(   i, collist, m, t, c, f) {
     Ct[c] = toupper(D["c_plot"][i]) "-" D["c_tag"][i]
     
     # test for c format
-    if (c !~ /^[a-z]{2}-[0-9]+$/)
+    if (c !~ /^[A-Za-z]{2}[-_][0-9]+$/)
       err("Colls: coll '" c "' is the wrong format.")
 
     # test for duplicates
@@ -222,46 +222,49 @@ function validate(   i, collist, m, t, c, f) {
   #   print i " is active"
 }
 
-function read_photo(sheet,  l, x, fam) {
+function read_photo(sheet,  l, x, fam, nf, i) {
 
+  # preread to find fam/morpho/tree
+  for (l = 2; l <= length(sheet); l++) {
+    nf = split(sheet[l], x, "\\")
+    if (nf >= 3)
+      for (i = 1; i <= nf ; i++)
+        if ((toupper(x[i]) ~ /^[A-Z]{5}$/) &&       \
+            (toupper(x[i+1]) ~ /^[A-Z0-9]{8}$/))
+          famf = i
+  }
+  
   # skip header
   for (l = 2; l <= length(sheet); l++) {
-    # skip blanks, etc
-    if (sheet[l] ~ /\\/) {
-      gsub(/C:\\Users\\cowebb\\Desktop\\GPTrees\\/,"",sheet[l])
-      # only parse lines with a tree
-      if (split(sheet[l], x, "\\") == 3) {
-        
-        # does the morpho exist?
-        if (!Morphos[x[2]]) {
-          err("Photos: tree '" x[3] "', morpho '"x[2]   \
-              "' is not in morpho spreadsheet.")
-          delete Morpho[x[3]]
-        }
-        else
-          fam[x[2]] = fam[x[2]] " " x[1]
-
-        # Is the fam the same as in morpho?
-        if (x[1] != Fam[x[2]]) 
-          err("Photos: morpho '" x[2] "', family '" x[1]                \
-              "' != fam in Morpho: '" Fam[x[2]] "'.")
-            
-        # Does the tree exist?
-        if (!Trees[x[3]]) {
-          err("Photos: tree '"x[3] "' is not in plot spreadsheet.")
-          delete Trees[x[3]]
-        }
-
-        # has it been classed as photo to morpho?
-        if (!Lf[x[3]])
-          err("Photos: tree '"x[3] "' is not 'dapat' in plot spreadsheet.")
-        
-        # if both exists
-        if (Morphos[x[2]] && Trees[x[3]])
-          F2m[x[3]] = x[2]
-
-        
+    # only parse lines with a tree
+    if (split(sheet[l], x, "\\") == famf+2) {
+      # does the morpho exist?
+      if (!Morphos[x[famf+1]]) {
+        err("Photos: tree '" x[famf+2] "', morpho '"x[famf+1] \
+            "' is not in morpho spreadsheet.")
+        delete Morpho[x[famf+2]]
       }
+      else
+        fam[x[famf+1]] = fam[x[famf+1]] " " x[famf]
+
+      # Is the fam the same as in morpho?
+      if (x[famf] != Fam[x[famf+1]]) 
+        err("Photos: morpho '" x[famf+1] "', family '" x[famf]  \
+            "' != fam in Morpho: '" Fam[x[famf+1]] "'.")
+            
+      # Does the tree exist?
+      if (!Trees[x[famf+2]]) {
+        err("Photos: tree '"x[famf+2] "' is not in plot spreadsheet.")
+        delete Trees[x[famf+2]]
+      }
+
+      # has it been classed as photo to morpho?
+      if (!Lf[x[famf+2]])
+        err("Photos: tree '"x[famf+2] "' is not 'dapat' in plot spreadsheet.")
+        
+      # if both exists
+      if (Morphos[x[famf+1]] && Trees[x[famf+2]])
+        F2m[x[famf+2]] = x[famf+1]
     }
   }
 

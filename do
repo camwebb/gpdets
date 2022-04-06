@@ -73,7 +73,7 @@ function default_page() {
     <h1>Upload XLSX file for GPDets</h1>                                \
     <form enctype=\"multipart/form-data\" action=\"do\" method=\"post\"> \
       <p>                                                               \
-        <input type=\"file\" name=\"xlsx\"/><br/><br/>                  \
+        Select Excel file: <input type=\"file\" name=\"xlsx\" /><br/><br/> \
         <input type=\"submit\" value=\"Submit\" />                      \
       </p>                                                              \
     </form>                                                             \
