@@ -71,7 +71,7 @@ function default_page() {
     <body>                                                              \
     <div class=\"main\">                                                \
     <h1>Upload XLSS file for GPDets</h1>                                \
-    <form enctype=\"multipart/form-data\" action=\"get\" method=\"post\"> \
+    <form enctype=\"multipart/form-data\" action=\"do\" method=\"post\"> \
       <p>                                                               \
         <input type=\"file\" name=\"xlsx\"/><br/><br/>                  \
         <input type=\"submit\" value=\"Submit\" />                      \
