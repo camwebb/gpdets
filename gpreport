@@ -18,6 +18,7 @@ function config() {
     "m_batang|m_daun|m_fam|m_genus|m_getah|m_macam|m_morpho_code|" \
     "m_notes|m_rb_coll|m_species|p_across|p_along|p_dbh|p_dir|p_direct_det|"  \
     "p_fallen_lvs|p_notes|p_plot|p_same_as_tag|p_tag|p_type"
+  Famlist = "ACANT|ACHAR|ACTIN|ALANG|AMARA|ANACA|ANCIS|ANNON|APOCY|AQUIF|ARACE|ARALI|ARAUC|ARECA|ARIST|ASCLE|ASPAR|ASPLE|ASTER|ATHYR|BALAN|BEGON|BIGNO|BISCO|BONNE|BORAG|BORRA|BURMA|BURSE|CALOP|CANNA|CAPPA|CARDI|CASUA|CELAS|CENTR|CHRYS|CLUSI|COMBR|COMME|CONNA|CONVO|CORNA|COSTA|CTENO|CUCUR|CUNON|CYCAD|CYPER|DENNS|DICHA|DILLE|DIOSC|DIPEN|DIPTE|EBENA|EBENE|ELAEO|ERICA|ERYTH|ESCAL|EUPHO|FABAC|FAGAC|FLACO|GENTI|GESNE|GNETA|GOODE|HERNA|HYMEN|HYPER|HYPOX|ICACI|INDET|IRVIN|IXONA|JUGLA|LAMIA|LAURA|LECYT|LEEAC|LILIA|LINAC|LOGAN|LOPHO|LORAN|LYCOP|LYTHR|MAGNO|MALVA|MARAN|MELAS|MELIA|MEMEC|MENIS|MONIM|MORAC|MUSAC|MYRIS|MYRSI|MYRTA|NEPEN|NEPHR|NYCTA|NYMPH|OCHNA|OLACA|OLEAC|OPHIO|OPILI|ORCHI|OXALI|PANDA|PARAC|PASSI|PENTA|PERAC|PHYLL|PIPER|POACE|PODOC|POLYG|POLYP|PRIMU|PTERI|PUTRA|RANUN|RHAMN|RHIZO|ROSAC|RUBIA|RUSCA|RUTAC|SABIA|SALIC|SANTA|SAPIN|SAPOT|SCHIS|SELAG|SIMAR|SMILA|SOLAN|SPHEN|STAPH|STEMO|STERC|STYRA|SYMPL|TACCA|TECTA|TETRA|TETRM|THEAC|THELY|THYME|ULMAC|URTIC|VERBE|VIOLA|VITAC|ZINGI"
 
   "mktemp -d" | getline TMPDIR
 }
@@ -100,9 +101,12 @@ function read_csv(sheet, prefix,   l,f,nf,fname,field) {
   }
 }
 
-function validate(   i, collist, m, t, c, f) {
-
+function validate(   i, collist, m, t, c, f, famlist) {
+  
   # All xls files: test for all columns present once only
+  split(Famlist, famlist, "|")
+  for (i in famlist)
+    Fams[famlist[i]] = 1
   split(Collist, collist, "|")
   for (i in D)
     if (i != collist[++j])
@@ -122,8 +126,10 @@ function validate(   i, collist, m, t, c, f) {
       err("Morpho: morpho '" m "' is not 8 chars.")
 
     # test for fam format
-    if (f !~ /^[A-Z]{5}$/)
-      err("Morpho: morpho '" m "', fam '" f "' bad format.")
+    if (!Fams[f]) {
+      err("Morpho: morpho '" m "', fam '" f "' not in allowed family codes.")
+      delete Fams[f]
+    }
     else
       Fam[m] = f
 
@@ -225,7 +231,7 @@ function validate(   i, collist, m, t, c, f) {
   #   print i " is active"
 }
 
-function read_photo(sheet,  l, x, fam, nf, i) {
+function read_photo(sheet,  l, x, famtest, nf, i) {
 
   # preread to find fam/morpho/tree
   for (l = 2; l <= length(sheet); l++) {
@@ -243,13 +249,19 @@ function read_photo(sheet,  l, x, fam, nf, i) {
     if (split(sheet[l], x, "\\") == famf+2) {
       # does the morpho exist?
       if (!Morphos[x[famf+1]]) {
-        err("Photos: tree '" x[famf+2] "', morpho '"x[famf+1] \
+        err("Photos: tree '" x[famf+2] "', morpho '"x[famf+1]   \
             "' is not in morpho spreadsheet.")
         delete Morpho[x[famf+2]]
       }
       else
-        fam[x[famf+1]] = fam[x[famf+1]] " " x[famf]
+        famtest[x[famf+1]] = famtest[x[famf+1]] " " x[famf]
 
+      # Is the fam field an allowed fam
+      if (!Fams[x[famf]]) {
+        err("Photos: family '" x[famf] "' is not an allowd family.")
+        delete Fams[x[famf]]
+      }
+      
       # Is the fam the same as in morpho?
       if (x[famf] != Fam[x[famf+1]]) 
         err("Photos: morpho '" x[famf+1] "', family '" x[famf]  \
@@ -280,9 +292,9 @@ function read_photo(sheet,  l, x, fam, nf, i) {
       }
   
   # test for occurrence of morpho in two or more fams
-  for (i in fam)
-    if (length(fam[i]) > 6)
-      err("Morpho '" i "' in photo list is in >1 family:" fam[i] ".")
+  for (i in famtest)
+    if (length(famtest[i]) > 6)
+      err("Morpho '" i "' in photo list is in >1 family:" famtest[i] ".")
 }
 
 function compute() {
