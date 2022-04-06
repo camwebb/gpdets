@@ -77,6 +77,7 @@ function default_page() {
         <input type=\"submit\" value=\"Submit\" />                      \
       </p>                                                              \
     </form>                                                             \
+    <p>(<a href=\"test/gpdets.xlsx\">demo file</a>)</p>                 \
     </div>                                                              \
     </body>                                                             \
     </html>"
