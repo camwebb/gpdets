@@ -126,6 +126,9 @@ function validate(   i, collist, m, t, c, f) {
       err("Morpho: morpho '" m "', fam '" f "' bad format.")
     else
       Fam[m] = f
+
+    Gen[m] = D["m_genus"][i]
+    Spec[m] = D["m_species"][i]
   }
   
   # Plots
@@ -352,9 +355,12 @@ function make_html() {
   # Morpho
   print "<h2>Morphotypes</h2><a name=\"morpho\"></a>"
   print "<table>"
-  print "<tr><th>Morpho</th><th>Collected</th></tr>"
+  print "<tr><th>Morpho</th><th>Family</th><th>Genus</th><th>Species</th><th>Collected</th></tr>"
   for (i in Morphos)
     print "<tr><td><a name=\"m_" i "\"></a>" i  "</td>"    \
+      "<td>" Fam[i] "</td>"                                \
+      "<td>" Gen[i] "</td>"                                \
+      "<td>" Spec[i] "</td>"                                \
       "<td>" ((Mcoll[i]) ? "sudah" : "") "</td></tr>"
   print "</table>"
 
@@ -413,8 +419,8 @@ function header() {
     "Verdana, Arial, Helvetica, sans-serif; }"
   print ".main {max-width: 1200px; padding-top: 30px; margin-left: auto;" \
     "  margin-right: auto; }"
-  print "table { font-family: monospace;}"
-  print "th, td { text-align: left; padding-left:10px; padding-right:10px;}"
+  print "table { font-family: monospace; border-collapse: collapse; }"
+  print "th, td { text-align: left; padding-left:10px; padding-right:10px;border: solid 1px;}"
   print "a { color:#15358d; text-decoration:none; border-bottom-style:none }"
   print "a:visited { color:#9f1dbc }"
   print "a:hover {color:#15358d; border-bottom-style:solid; "\
