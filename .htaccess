@@ -1,0 +1,17 @@
+Options +ExecCGI -Indexes
+
+<Files "do">
+  SetHandler cgi-script
+</Files>
+
+DirectoryIndex do
+
+<FilesMatch "^\.htaccess$">
+  Deny from all
+</FilesMatch>
+
+# AuthType Basic
+# AuthName "Password Protected"
+# AuthUserFile /home/cam/public_html/akflora/alaskaflora.org/chars/.pw
+# Require valid-user
+
