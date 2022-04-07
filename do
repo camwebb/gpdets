@@ -2,6 +2,13 @@
 
 BEGIN{
 
+  # check data directory
+  while(("/usr/bin/du -sk data" | getline)>0)
+    datasize = $1
+  
+  if (datasize > 100000)
+    fail("Data directory full")
+  
   # sending data?
   if (ENVIRON["CONTENT_TYPE"] ~ /form-data/)
     read_file()
@@ -26,7 +33,8 @@ function fail(msg) {
 function read_file(   ct, total) {
 
   # Temporary directory
-  "mktemp -d" | getline TEMPDIR ;
+  # "mktemp -d" | getline TEMPDIR ;
+  TEMPDIR = "data"
   FILE = strftime("%Y%m%d_%H%H.xlsx")
   
   RS = ORS = "\r\n"
