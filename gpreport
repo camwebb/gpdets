@@ -278,17 +278,20 @@ function read_photo(sheet,  l, x, famtest, nf, i) {
         err("Photos: tree '"x[famf+2] "' is not 'dapat' in plot spreadsheet.")
         
       # if both exists
-      if (Morphos[x[famf+1]] && Trees[x[famf+2]])
-        F2m[x[famf+2]] = x[famf+1]
+      if (Morphos[x[famf+1]] && Trees[x[famf+2]]) {
+        P2m[x[famf+2]] = x[famf+1]
+        # store list of morphos in the photo sheet
+        Pmorphos[x[famf+1]] = 1
+      }
     }
   }
 
   # Check all dapat are in 
   for (i in Trees)
     if (Lf[i])
-      if (!F2m[i]) {
-        err("Morpho: tree '" i "' says 'fallen_lf' but there is no photo.")
-        delete F2m[i]
+      if (!P2m[i]) {
+        err("Plots: tree '" i "' says 'fallen_lf' but there is no photo.")
+        delete P2m[i]
       }
   
   # test for occurrence of morpho in two or more fams
@@ -300,15 +303,19 @@ function read_photo(sheet,  l, x, famtest, nf, i) {
 function compute() {
   for (i in Trees) {
     # fallen leaf det overrides
-    if (F2m[i])
-      Morpho[i] = F2m[i]
+    if (P2m[i])
+      Morpho[i] = P2m[i]
     # direct next
     else if (Dd[i]) {
-      Morpho[i] = Dd[i]
-      delete F2m[i]
+      if (!Pmorphos[Dd[i]])
+        err("Plots: tree '" i "', direct_det '" Dd[i]               \
+            "': morpho not allowed as direct_det, no fallen_lvs.")
+      else
+        Morpho[i] = Dd[i]
     }
-    else
-      delete F2m[i]
+    if (!P2m[i])
+      # need to delete, because length(P2m) used
+      delete P2m[i]
   }
 
   # rerun for Same as once dets given 
@@ -359,7 +366,7 @@ function make_html() {
   print "<tr><td>Total morphos in 'morpho' spreadsheet:</td>"   \
     "<td style=\"text-align: right;\">" length(Morphos) "</td></tr>"
   print "<tr><td>Total trees with fallen leaf morphos:</td>"\
-    "<td style=\"text-align: right;\">" length(F2m) "</td></tr>"
+    "<td style=\"text-align: right;\">" length(P2m) "</td></tr>"
   print "<tr><td>Number of plots that have any dets:</td>"\
     "<td style=\"text-align: right;\">" length(Active) "</td></tr>"
   print "</table>"
