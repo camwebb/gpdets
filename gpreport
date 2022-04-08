@@ -140,8 +140,10 @@ function validate(   i, collist, m, t, c, f, famlist) {
   # Plots
   for (i in D["p_plot"]) {
     
+    
     # transfer
     t = toupper(D["p_plot"][i]) "-" D["p_tag"][i]
+    Porder[i] = t
     Plot[t] = toupper(D["p_plot"][i])
     Dd[t] = D["p_direct_det"][i]
     Sa[t] = D["p_same_as_tag"][i]
@@ -186,12 +188,12 @@ function validate(   i, collist, m, t, c, f, famlist) {
         err("Plots: tree '" t "', same_as_tag '" Sa[t] "' refers to self.")
 
     # type of det
-    if (Dd[t])
+    if (Lf[t])
+      Dtype[t] = "fallen_lvs"
+    else if (Dd[t])
       Dtype[t] = "direct"
     else if (Sa[t])
       Dtype[t] = "same_as"
-    else if (Lf[t])
-      Dtype[t] = "fallen_lf"
     
     # check for any activity in plot
     if (Dd[t] || Sa[t] || Lf[t])
@@ -397,19 +399,22 @@ function make_html() {
   print "<h2>Plots (active only)</h2><a name=\"plots\"></a>"
   print "<table>"
   print "<tr><th>Plant</th><th>Type</th><th>DBH</th><th>Det type</th><th>Morpho</th></tr>"
-  for (i in Trees)
+  PROCINFO["sorted_in"] = "@ind_num_asc"
+  for (j in Porder) {
+    i = Porder[j]
     if (Active[Plot[i]])
       print "<tr><td><a name=\"p_" i "\"></a>" i  "</td>"        \
         "<td>" Hab[i] "</td>"                   \
         "<td style=\"text-align: right;\">" sprintf("%.1f",Dbh[i]) "</td>"      \
         "<td>" Dtype[i] "</td>"                    \
-        "<td><a href=\"#m_" Morpho[i] "\">" Morpho[i] "</a></td></tr>"                   
+        "<td><a href=\"#m_" Morpho[i] "\">" Morpho[i] "</a></td></tr>"            }       
   print "</table>"
 
   # Hitlists
   print "<h2>Hitlist for collecting morphos</h2><a name=\"hitlist\"></a>"
   print "<table>"
   print "<tr><th>Morpho</th><th>Possible individuals (DBH)</th></tr>"
+  PROCINFO["sorted_in"] = "@ind_str_asc"
   for (i in Morphos)
     if (!Mcoll[i]) {
       print "<tr><td>" i " :</td><td>"
