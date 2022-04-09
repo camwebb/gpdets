@@ -1,0 +1,20 @@
+#!/bin/sh
+
+cd /home/cam/public_html/gpdets/md
+
+if [ $# -eq 1 ]
+then
+    echo "  "${1/md/html}
+    pandoc -s --template=template.html \
+           -o ../${1/md/html} $1
+    # check
+    tidy -e ../${1/md/html} 2>&1 >/dev/null | grep errors
+else
+    for i in [A-Za-z0-9]*.md
+    do
+        echo "  "${i/md/html}
+        pandoc -s --template=template.html -o ../${i/md/html} $i
+    done
+fi
+
+

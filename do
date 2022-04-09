@@ -86,6 +86,8 @@ function default_page() {
       </p>                                                              \
     </form>                                                             \
     <p>(<a href=\"test/gpdets.xlsx\">demo file</a>)</p>                 \
+    <p style=\"padding-top: 30px;\"><a href=\"methods.html\">"          \
+      "More information</a></p>                                         \
     </div>                                                              \
     </body>                                                             \
     </html>"

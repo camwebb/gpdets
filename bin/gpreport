@@ -285,7 +285,7 @@ function read_photo(sheet,  l, x, famtest, nf, i) {
   for (i in Trees)
     if (Lf[i])
       if (!P2m[i]) {
-        err("Plots: tree '" i "' says 'fallen_lf' but there is no photo.")
+        err("Plots: tree '" i "' says 'fallen_lvs' but there is no photo.")
         delete P2m[i]
       }
   
