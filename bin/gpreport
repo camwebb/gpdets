@@ -8,7 +8,7 @@ BEGIN{
   read_args()
   read_xls()
 
-  compute()
+  compute_morpho()
   make_html()
 }
 
@@ -187,14 +187,6 @@ function validate(   i, collist, m, t, c, f, famlist) {
       if (Sa[t] == D["p_tag"][i])
         err("Plots: tree '" t "', same_as_tag '" Sa[t] "' refers to self.")
 
-    # type of det
-    if (Lf[t])
-      Dtype[t] = "fallen_lvs"
-    else if (Dd[t])
-      Dtype[t] = "direct"
-    else if (Sa[t])
-      Dtype[t] = "same_as"
-    
     # check for any activity in plot
     if (Dd[t] || Sa[t] || Lf[t])
       Active[D["p_plot"][i]] = 1
@@ -205,6 +197,7 @@ function validate(   i, collist, m, t, c, f, famlist) {
   for (i in D["c_code"]) {
     c = D["c_code"][i]
     Ct[c] = toupper(D["c_plot"][i]) "-" D["c_tag"][i]
+    Cdate[c] = D["c_coll_date"][i]
     
     # test for c format
     if (c !~ /^[A-Za-z]{2}[-_][0-9]+$/)
@@ -302,34 +295,49 @@ function read_photo(sheet,  l, x, famtest, nf, i) {
       err("Morpho '" i "' in photo list is in >1 family:" famtest[i] ".")
 }
 
-function compute() {
+function compute_morpho() {
+  # Key logic:
+  # 1. fallen leaf det is best
   for (i in Trees) {
-    # fallen leaf det overrides
-    if (P2m[i])
+    if (P2m[i]) {
       Morpho[i] = P2m[i]
-    # direct next
-    else if (Dd[i]) {
-      if (!Pmorphos[Dd[i]])
-        err("Plots: tree '" i "', direct_det '" Dd[i]               \
-            "': morpho not allowed as direct_det, no fallen_lvs.")
-      else
-        Morpho[i] = Dd[i]
+      Dtype[i] = "fallen_lvs"
     }
-    if (!P2m[i])
+    else
       # need to delete, because length(P2m) used
       delete P2m[i]
   }
 
-  # rerun for Same as once dets given 
-  for (i in Trees)
-    if (Sa[i]) {
-      # TODO make this check not just morpho, but either Ddet or photo
-      if (Morpho[Plot[i] "-" Sa[i]])
-        Morpho[i] = Morpho[Plot[i] "-" Sa[i]]
-      else
-        err("Plots: tree '" i "', same_as_tag '" Sa[i]  \
-           "' refers to plant without morpho.")
+  # need to rerun (i in Trees) because same_as may be to a tree 'after' i 
+  for (i in Trees) {
+    # ignore, if there is already a det from fallen_lvs
+    if (!Morpho[i]) {
+      # 2. Same as a fallen_lvs in same plot
+      if (Sa[i]) {
+        if (Morpho[Plot[i] "-" Sa[i]]) {
+          Morpho[i] = Morpho[Plot[i] "-" Sa[i]]
+          Dtype[i] = "same_as"
+        }
+        else
+          err("Plots: tree '" i "' says same_as '" Plot[i] "-" Sa[i]    \
+              "' but that has no 'fallen_lvs'")
+      }
+
+      # use 'else' to ignore Dd if there is a Sa
+      else if (Dd[i]) {
+        if (!Pmorphos[Dd[i]]) {
+          err("Plots: tree '" i "', direct_det '" Dd[i]             \
+              "': morpho not allowed as direct_det, no fallen_lvs.")
+          # length(Pmorphos needed later)
+          delete Pmorphos[Dd[i]]
+        }
+        else {
+          Morpho[i] = Dd[i]
+          Dtype[i] = "direct"
+        }
+      }
     }
+  }
 
   for (i in Colls) {
     Cdet[i] = Morpho[Ct[i]]
@@ -367,6 +375,8 @@ function make_html() {
     "<td style=\"text-align: right;\">" length(Trees) "</td></tr>"
   print "<tr><td>Total morphos in 'morpho' spreadsheet:</td>"   \
     "<td style=\"text-align: right;\">" length(Morphos) "</td></tr>"
+  print "<tr><td>Total morphos in 'photos' directories:</td>"\
+    "<td style=\"text-align: right;\">" length(Pmorphos) "</td></tr>"
   print "<tr><td>Total trees with fallen leaf morphos:</td>"\
     "<td style=\"text-align: right;\">" length(P2m) "</td></tr>"
   print "<tr><td>Number of plots that have any dets:</td>"\
@@ -388,9 +398,10 @@ function make_html() {
   # Colls
   print "<h2>Collections</h2><a name=\"colls\"></a>"
   print "<table>"
-  print "<tr><th>Coll code</th><th>Plant</th><th>Morpho</th></tr>"
+  print "<tr><th>Coll code</th><th>Date</th><th>Plant</th><th>Morpho</th></tr>"
   for (i in Colls)
     print "<tr><td>" i  "</td>"                 \
+      "<td>" Cdate[i] "</td>"                   \
       "<td>" Ct[i] "</td>"                      \
       "<td>" Morpho[Ct[i]] "</td></tr>"
   print "</table>"

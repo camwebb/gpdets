@@ -16,7 +16,7 @@ BEGIN{
     default_page()
   
   print "Content-Type: text/html\n"
-  if (system("./gpreport " TEMPDIR "/" FILE " 2> " TEMPDIR "/error")) {
+  if (system("./bin/gpreport " TEMPDIR "/" FILE " 2> " TEMPDIR "/error")) {
     print "<html><pre>"
     system("cat " TEMPDIR "/error")
     print "</pre></html>"

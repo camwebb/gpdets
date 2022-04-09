@@ -1,2 +1,4 @@
-data*
+data/*
+!data/.htaccess
 server_data*
+TAGS
