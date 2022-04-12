@@ -55,7 +55,8 @@ function read_xls(    i, line, cmd) {
     line = 0
     cmd = "xlsx2csv -s " i " " INFILE
     while ((cmd | getline) > 0)
-      S[i][++line] = $0
+      if ($0 && ($0 !~ /^[, ]+$/))
+        S[i][++line] = $0
     close(cmd)
 
     switch (S[i][1]) {
@@ -136,10 +137,11 @@ function validate(   i, collist, m, t, c, f, famlist) {
     Gen[m] = D["m_genus"][i]
     Spec[m] = D["m_species"][i]
   }
+
+  delete Morphos[""]
   
   # Plots
   for (i in D["p_plot"]) {
-    
     
     # transfer
     t = toupper(D["p_plot"][i]) "-" D["p_tag"][i]
@@ -158,7 +160,7 @@ function validate(   i, collist, m, t, c, f, famlist) {
     # test for duplicates
     if (++Trees[t] > 1)
       err("Plots: tree '" t "' is a duplicate.")
-  
+    
     # test: only one of three det options allowed
     if ((Dd[t] && Sa[t]) || (Dd[t] && Lf[t]) || (Lf[t] && Sa[t]))
       err("Plots: tree '" t "' has more than just one kind of det.")
@@ -181,7 +183,7 @@ function validate(   i, collist, m, t, c, f, famlist) {
             "' is not in Morpho spreadsheet.")
         delete Morphos[Dd[t]]
       }
-
+    
     # test: is the same_as referring to self?
     if (Sa[t])
       if (Sa[t] == D["p_tag"][i])
@@ -208,7 +210,7 @@ function validate(   i, collist, m, t, c, f, famlist) {
       err("Colls: coll '" c "' is a duplicate.")
 
     # test for date format
-    if (D["c_coll_date"][i] !~ /^2022-0[1-9]-[123][0-9]$/)
+    if (D["c_coll_date"][i] !~ /^2022-0[1-9]-[0123][0-9]$/)
       err("Colls: coll '" c "', date '" D["c_coll_date"][i] "' bad format.")
     
     # test for Ct
@@ -218,8 +220,9 @@ function validate(   i, collist, m, t, c, f, famlist) {
   }
 
     
-  # for (i in Morpho)
+  # for (i in Morphos)
   #   print i
+  # exit
   # for (i in Id)
   #   print i, Id[i]
   # for (i in Active)
@@ -230,6 +233,9 @@ function read_photo(sheet,  l, x, famtest, nf, i) {
 
   # preread to find fam/morpho/tree
   for (l = 2; l <= length(sheet); l++) {
+    # delete empty colls
+    gsub(/[, ]*$/,"",sheet[l])
+
     nf = split(sheet[l], x, "\\")
     if (nf >= 3)
       for (i = 1; i <= nf ; i++)
@@ -240,17 +246,28 @@ function read_photo(sheet,  l, x, famtest, nf, i) {
   
   # skip header
   for (l = 2; l <= length(sheet); l++) {
+    nf = split(sheet[l], x, "\\")
+    # clean
+    for (i in x)
+      x[i] = clean(x[i])
+    
     # only parse lines with a tree
-    if (split(sheet[l], x, "\\") == famf+2) {
+    if (nf == famf+2) {
       # does the morpho exist?
       if (!Morphos[x[famf+1]]) {
         err("Photos: tree '" x[famf+2] "', morpho '"x[famf+1]   \
             "' is not in morpho spreadsheet.")
-        delete Morpho[x[famf+2]]
+        delete Morphos[x[famf+1]]
       }
-      else
-        famtest[x[famf+1]] = famtest[x[famf+1]] " " x[famf]
-
+      
+      if (!famtest[x[famf+1]])
+        famtest[x[famf+1]] = x[famf]
+      # now test
+      else if (famtest[x[famf+1]] != x[famf])
+        # test for occurrence of morpho in two or more fams
+        err("Morpho '" x[famf+1] "' in photo list is in >1 family: " \
+            famtest[x[famf+1]] " and " x[famf] ".")
+      
       # Is the fam field an allowed fam
       if (!Fams[x[famf]]) {
         err("Photos: family '" x[famf] "' is not an allowd family.")
@@ -281,18 +298,17 @@ function read_photo(sheet,  l, x, famtest, nf, i) {
     }
   }
 
+  # for (i in Morphos)
+  #   print i, Morphos[i]
+  # exit
+  
   # Check all dapat are in 
   for (i in Trees)
     if (Lf[i])
       if (!P2m[i]) {
-        err("Plots: tree '" i "' says 'fallen_lvs' but there is no photo.")
+        err("Plots: tree '" i "' says 'fallen_lvs' but there is no photo, or photo morpho name not same as Morpho sheet name.")
         delete P2m[i]
       }
-  
-  # test for occurrence of morpho in two or more fams
-  for (i in famtest)
-    if (length(famtest[i]) > 6)
-      err("Morpho '" i "' in photo list is in >1 family:" famtest[i] ".")
 }
 
 function compute_morpho() {
@@ -386,7 +402,7 @@ function make_html() {
   # Morpho
   print "<h2>Morphotypes</h2><a name=\"morpho\"></a>"
   print "<table>"
-  print "<tr><th>Morpho</th><th>Family</th><th>Genus</th><th>Species</th><th>Collected</th></tr>"
+  print "<tr><th>Morpho</th><th>Family</th><th>Genus</th><th>Species</th><th>Specimen</th></tr>"
   for (i in Morphos)
     print "<tr><td><a name=\"m_" i "\"></a>" i  "</td>"    \
       "<td>" Fam[i] "</td>"                                \
