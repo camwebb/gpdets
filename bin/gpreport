@@ -77,27 +77,27 @@ function read_xls(    i, line, cmd) {
   #   for (j in S[i])
   #     print i, j, S[i][j]
 
-  read_csv(S[x["p"]], "p")
-  read_csv(S[x["m"]], "m")
-  read_csv(S[x["c"]], "c")
+  read_csv(S[x["p"]], "p", 11)
+  read_csv(S[x["m"]], "m", 10)
+  read_csv(S[x["c"]], "c", 6)
 
   validate()
 
   read_photo(S[x["f"]])
 }
 
-function read_csv(sheet, prefix,   l,f,nf,fname,field) {
+function read_csv(sheet, prefix, cols,   l,f,fname,field) {
 
   FPAT = "([^,]*)|(\"[^\"]+\")"
   for (l = 1; l <= length(sheet); l++) {
-    nf = patsplit(sheet[l], field)
+    patsplit(sheet[l], field)
     # headers
     if (l == 1)
-      for (f = 1; f <= nf; f++)
+      for (f = 1; f <= cols; f++)
         fname[f] = clean(field[f])
     # data
     else
-      for (f = 1; f <= nf; f++)
+      for (f = 1; f <= cols; f++)
         D[(prefix "_" fname[f])][l-1] = clean(field[f])
   }
 }
