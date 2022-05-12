@@ -51,7 +51,7 @@ function read_file(   ct, total) {
       { }
     else {
       total += length($0)
-      if (total < 100000)
+      if (total < 1000000)
         print $0 > TEMPDIR "/" FILE
       else
         fail("File size too big!")
